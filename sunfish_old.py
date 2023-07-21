@@ -1,18 +1,10 @@
-#!/home/dsewell/Projects/sunfish/.venv/bin/python
-
-#!/usr/bin/env python3
+#!/home/dsewell/Projects/sunfish/.venv/bin python
 from __future__ import print_function
 
 import time, math
 from itertools import count
 from collections import namedtuple, defaultdict
-
 import torch
-import torch.nn as nn
-
-from chess_llm_db.chess_tokenizer import ChessTokenizer
-from transformers import GPT2LMHeadModel
-
 
 # If we could rely on the env -S argument, we could just use "pypy3 -u"
 # as the shebang to unbuffer stdout. But alas we have to do this instead:
@@ -148,18 +140,8 @@ opt_ranges = dict(
 
 Move = namedtuple("Move", "i j prom")
 
-def parse(c):
-    fil, rank = ord(c[0]) - ord("a"), int(c[1]) - 1
-    return A1 + fil - 10 * rank
 
-
-def render(i):
-    rank, fil = divmod(i - A1, 10)
-    return chr(fil + ord("a")) + str(-rank + 1)
-
-
-
-class Position(namedtuple("Position", "board score wc bc ep kp uci")):
+class Position(namedtuple("Position", "board score wc bc ep kp")):
     """A state of a chess game
     board -- a 120 char representation of the board
     score -- the board evaluation
@@ -215,12 +197,10 @@ class Position(namedtuple("Position", "board score wc bc ep kp uci")):
             self.board[::-1].swapcase(), -self.score, self.bc, self.wc,
             119 - self.ep if self.ep and not nullmove else 0,
             119 - self.kp if self.kp and not nullmove else 0,
-            self.uci
         )
 
     def move(self, move):
         i, j, prom = move
-        move_str = render(i) + render(j) + move.prom.lower()
         p, q = self.board[i], self.board[j]
         put = lambda board, i, p: board[:i] + p + board[i + 1 :]
         # Copy variables and reset ep and kp
@@ -251,7 +231,7 @@ class Position(namedtuple("Position", "board score wc bc ep kp uci")):
             if j == self.ep:
                 board = put(board, j + S, ".")
         # We rotate the returned position, so it's ready for the next player
-        return Position(board, score, wc, bc, ep, kp, move_str).rotate()
+        return Position(board, score, wc, bc, ep, kp).rotate()
 
     def value(self, move):
         i, j, prom = move
@@ -287,16 +267,10 @@ Entry = namedtuple("Entry", "lower upper")
 
 class Searcher:
     def __init__(self):
-        print("Searcher")
         self.tp_score = {}
         self.tp_move = {}
         self.history = set()
         self.nodes = 0
-        vocab_path = "./data/vocab.txt"
-        self.tokenizer = ChessTokenizer(vocab_path)
-        self.model = GPT2LMHeadModel.from_pretrained('shtoshni/gpt2-chess-uci')
-        self.softmax = nn.Softmax(dim=None)
-
 
     def bound(self, pos, gamma, depth, can_null=True):
         """ Let s* be the "true" score of the sub-tree we are searching.
@@ -393,13 +367,7 @@ class Searcher:
         # Run through the moves, shortcutting when possible
         best = -MATE_UPPER
         for move, score in moves():
-            troll_score = 0
-            if move is not None:
-                move_str = render(move.i) + render(move.j) + move.prom.lower()
-                idx = self.tokenizer.vocab[move_str[:2]]
-                troll_score = self.get_troll_score(gamma, idx)
-            best = max(best, score) + int(troll_score)
-            #best = max(best, score) + 0.0
+            best = max(best, score)
             if best >= gamma:
                 # Save the move for pv construction and killer heuristic
                 if move is not None:
@@ -444,21 +412,6 @@ class Searcher:
         self.history = set(history)
         self.tp_score.clear()
 
-        game_prefix = [self.tokenizer.bos_token_id]
-        for h in history:
-            game_prefix.extend(self.tokenizer.encode(h.uci, add_special_tokens=False, get_move_end_positions=False))
-        
-        greedy_game_prefix = list(game_prefix)
-        prefix_tens = torch.tensor([greedy_game_prefix])
-        with torch.no_grad():
-            logits = self.model(prefix_tens)[0]
-            prob_next = self.softmax(logits.flatten()).detach().numpy()
-            #prob_next[np.where(prob_next < 0.0025)] = 1 # ignore actions that have < .25% prob of being played
-            prob_next = 1.0 - prob_next
-
-        troll_lambda = 0.55
-        self.get_troll_score = lambda gamma, idx: prob_next[idx]*gamma*troll_lambda
-        #print(hasattr(history, "legal_moves"))
         gamma = 0
         # In finished games, we could potentially go far enough to cause a recursion
         # limit exception. Hence we bound the ply. We also can't start at 0, since
@@ -471,8 +424,6 @@ class Searcher:
             lower, upper = -MATE_LOWER, MATE_LOWER
             while lower < upper - EVAL_ROUGHNESS:
                 score = self.bound(history[-1], gamma, depth, can_null=False)
-                #print("---- Score ---")
-                #print(score)
                 if score >= gamma:
                     lower = score
                 if score < gamma:
@@ -485,6 +436,7 @@ class Searcher:
 # UCI User interface
 ###############################################################################
 
+
 def parse(c):
     fil, rank = ord(c[0]) - ord("a"), int(c[1]) - 1
     return A1 + fil - 10 * rank
@@ -494,20 +446,12 @@ def render(i):
     rank, fil = divmod(i - A1, 10)
     return chr(fil + ord("a")) + str(-rank + 1)
 
-hist = [Position(initial, 0, (True, True), (True, True), 0, 0, "")]
-
+hist = [Position(initial, 0, (True, True), (True, True), 0, 0)]
 
 #input = raw_input
 
 # minifier-hide start
 import sys, tools.uci
-import torch
-import torch.nn as nn
-
-from chess_llm_db.chess_tokenizer import ChessTokenizer
-from transformers import GPT2LMHeadModel
-
-
 tools.uci.run(sys.modules[__name__], hist[-1])
 sys.exit()
 # minifier-hide end

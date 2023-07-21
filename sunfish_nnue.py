@@ -1,4 +1,4 @@
-#!/usr/bin/env pypy3
+#!/usr/bin/env python
 
 import sys, time, pickle
 from itertools import count

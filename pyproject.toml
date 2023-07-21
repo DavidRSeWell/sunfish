@@ -1,0 +1,15 @@
+[project]
+name = "sunfish"
+version = "0.1.0"
+description = "Add a short description here"
+dependencies = ["chess~=1.9.4", "tqdm~=4.65.0", "transformers~=4.30.2", "torch~=2.0.1", "pyminifier~=2.1", "PySimpleGUI~=4.60.5", "pyperclip~=1.8.2"]
+readme = "README.md"
+requires-python = ">= 3.8"
+license = { text = "MIT" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.rye]
+managed = true

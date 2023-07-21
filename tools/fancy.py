@@ -1,3 +1,4 @@
+#!/home/dsewell/Projects/sunfish/.venv/bin/python
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -37,6 +38,8 @@ parser.add_argument(
 
 
 async def load_engine_from_cmd(cmd, debug=False):
+    print("Load engine from cmd")
+    print(cmd.split())
     _, engine = await chess.engine.popen_uci(cmd.split())
     if hasattr(engine, "debug"):
         engine.debug(debug)
@@ -44,6 +47,7 @@ async def load_engine_from_cmd(cmd, debug=False):
 
 
 async def load_engine_from_conf(engine_args, name, debug=False):
+    print("Load engine from conf")
     args = next(a for a in engine_args if a["name"] == name)
     curdir = str(pathlib.Path(__file__).parent)
     popen_args = {}
@@ -122,9 +126,12 @@ async def get_engine_move(engine, board, limit, game_id, multipv, debug=False):
     # XBoard engine doesn't support multipv, and there python-chess doesn't support
     # getting the first PV while playing a game.
     if isinstance(engine, chess.engine.XBoardProtocol):
+        print("I am a XBoard Protocol or whatever")
         play_result = await engine.play(board, limit, game=game_id)
         return play_result.move
 
+    print("I am not a Xboard Protocol")
+    print(type(board))
     multipv = min(multipv, board.legal_moves.count())
     with await engine.analysis(
         board, limit, game=game_id, info=chess.engine.INFO_ALL, multipv=multipv or None
@@ -141,7 +148,7 @@ async def get_engine_move(engine, board, limit, game_id, multipv, debug=False):
             # Parse optional arguments into a dict
             if debug and "string" in new_info:
                 print(new_info["string"])
-
+            
             if not debug and all(infos) and "score" in analysis.info:
                 if not first:
                     # print('\n'*(multipv+1), end='')
@@ -150,6 +157,7 @@ async def get_engine_move(engine, board, limit, game_id, multipv, debug=False):
                     first = False
 
                 info = analysis.info
+                print(info["score"])
                 score = info["score"].relative
                 score = (
                     f"Score: {score.score()}"
